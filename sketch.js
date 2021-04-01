@@ -1,17 +1,20 @@
 var Slider;
 var SliderText;
 var Start;
-var CanvasSize = 800.0;
+var CanvasSize = 900.0;
 var Timer = [0, 0, 0];
 var TimerText;
 var neuralNetwork;
+var nodeRadius = 32;//çember yarıçapı
+var nodeEmptyPixel = nodeRadius;//nodelar arası boşluk
+var layerEmptyPixel = nodeRadius * 4;//layerlar arası boşluk
+var lineWidth = 2;
 function setup() 
 {
     let cns = createCanvas(CanvasSize, CanvasSize);
     cns.parent("canvas");
     background("255");
     color("black");
-    rect(0, 0, CanvasSize, CanvasSize);
     Start = false;
     Slider = document.getElementById("frameRateSlider");
     SliderText = document.getElementById("frameRateSliderText");
@@ -21,10 +24,7 @@ function setup()
     {
         SliderText.innerHTML = "FrameRate: " + this.value;
     }
-    this.neuralNetwork = new NeuralNetwork(6, 2, 0.01);
-    this.neuralNetwork.addHiddenLayer(4);  
-    this.neuralNetwork.addHiddenLayer(8); 
-    this.neuralNetwork.generate();
+    this.neuralNetwork = new NeuralNetwork([{PerceptronCount: 3}, {PerceptronCount: 2, ActivationFunction: sigmoid}, {PerceptronCount: 4, ActivationFunction: sigmoid}, {PerceptronCount: 2, ActivationFunction: sigmoid}], 0.01); 
 }
 function startStop() 
 {
@@ -40,23 +40,13 @@ function startStop()
 }
 function mousePressed()
 {
-    neuralNetwork.resetSelectedPerceptron();
-    let selectedPerceptron = this.neuralNetwork.isPixelContains({X: mouseX, Y: mouseY});
-    if(selectedPerceptron)
-    {
-        selectedPerceptron.Selected = true;
-        neuralNetwork.HasSelectedPerceptron = true;
-    }
-    else
-    {
-        neuralNetwork.HasSelectedPerceptron = false;
-    }
+    this.neuralNetwork.selectPerceptron({X: mouseX, Y: mouseY});
 }
 function draw() 
 {
     parseInt(Slider.value);
     background("white");
-    rect(0, 0, width, height);
+    rect(0, 0, width,  height)
     this.neuralNetwork.draw();
     if (Start) 
     {

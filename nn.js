@@ -1,6 +1,4 @@
-var nodeRadius = 16;//çember yarıçapı
-var nodeEmptyPixel = nodeRadius;//nodelar arası boşluk
-var layerEmptyPixel = nodeRadius * 4;//layerlar arası boşluk
+
 function sign(n)
 {
     if(n >= 0)
@@ -12,243 +10,245 @@ function sign(n)
         return -1;
     }
 }
+function sigmoid(n) 
+{
+    return 1 / ( 1 + Math.pow(Math.E, -n));
+}
 class NeuralNetwork
 {
-    constructor(inputPerceptronCount, outputPerceptronCount, learningRate = 0.01)
+    constructor(layers, learningRate)
     {
-        this.InputPerceptronCount = inputPerceptronCount;
-        this.OutputPerceptronCount = outputPerceptronCount;
-        this.HiddenPerceptronCounts = [];
+        let layerEmptyPixel = (width - ((2 * nodeRadius) * (layers.length + 1))) / (layers.length - 1);
         this.LearningRate = learningRate;
-    }
-    generate()
-    {
-        this.OutputLayer = new Layer(this.OutputPerceptronCount, undefined, sign);
-        if(this.HiddenPerceptronCounts.length === 0)
+
+        //creating layers
+        this.Layers = [];
+        for(let i = 0; i < layers.length; i++)
         {
-            this.InputLayer = new Layer(this.InputPerceptronCount, this.OutputLayer, sign);
+            this.Layers.push(new Layer(layers[i].PerceptronCount, i, layerEmptyPixel, layers[i].ActivationFunction));
         }
-        else
+
+        //init weights
+        for(let i = 0; i < this.Layers.length - 1; i++)
         {
-            this.HiddenLayers = [];
-            for(let i = 0; i < this.HiddenPerceptronCounts.length; i++)
+            this.Layers[i].Perceptrons.forEach(perceptron => 
             {
-                if(i === 0)
-                {
-                    this.HiddenLayers.push(new Layer(this.HiddenPerceptronCounts[i], undefined, sign));
-                }
-                else if(i === (this.HiddenPerceptronCounts.length - 1))
-                {
-                    this.HiddenLayers.push(new Layer(this.HiddenPerceptronCounts[i], this.OutputLayer, sign));
-                    this.HiddenLayers[this.HiddenLayers.length - 2].setNextLayer(this.HiddenLayers[this.HiddenLayers.length - 1]);
-                }
-                else
-                {
-                    this.HiddenLayers.push(new Layer(this.HiddenPerceptronCounts[i], undefined, sign));
-                    this.HiddenLayers[this.HiddenLayers.length - 2].setNextLayer(this.HiddenLayers[this.HiddenLayers.length - 1]);
-                }
-            }
-            this.InputLayer = new Layer(this.InputPerceptronCount, this.HiddenLayers[0], sign);
+                perceptron.initWeights(this.Layers[i + 1].Perceptrons.length);
+            }); 
         }
-    }
-    addHiddenLayer(hiddenPerceptronCount)
-    {
-        this.HiddenPerceptronCounts.push(hiddenPerceptronCount);
     }
     draw()
     {
-        let Layers = this.getLayers();
-        let layerEmptyPixel = (width - ((2 * nodeRadius) * (Layers.length + 1))) / (Layers.length - 1);
-        for(let layerIndex = 0; layerIndex < Layers.length; layerIndex++)
+        if(this.Layers)
         {
-            Layers[layerIndex].draw(layerIndex, layerEmptyPixel, this.HasSelectedPerceptron);
-        }
-    }
-    getLayers()
-    {
-        let Layers = [this.InputLayer];
-        this.HiddenLayers.forEach(hiddenLayer => 
-        {
-            Layers.push(hiddenLayer);
-        });
-        Layers.push(this.OutputLayer);
-        return Layers;
-    }
-    isPixelContains(point)
-    {
-        let Layers = this.getLayers();
-        let layerEmptyPixel = (width - ((2 * nodeRadius) * (Layers.length + 1))) / (Layers.length - 1);
-        for(let layerIndex = 0; layerIndex < Layers.length; layerIndex++)
-        {
-            let selected = Layers[layerIndex].isPixelContains(point, layerIndex, layerEmptyPixel);
-            if(selected)
+            for(let layerIndex = 0; layerIndex < this.Layers.length; layerIndex++)
             {
-                return selected;
+                let currentLayer = this.Layers[layerIndex];
+                currentLayer.Perceptrons.forEach(perceptron => 
+                {
+                    perceptron.draw();
+                    
+                    //draw connections
+                    if(layerIndex !== this.Layers.length - 1)
+                    {
+                        let nextLayer = this.Layers[layerIndex + 1];
+                        for(let i = 0; i < nextLayer.Perceptrons.length; i++)
+                        {
+                            //draw connection line
+                            stroke(perceptron.Weights[i] >= 0 ? "blue" : "red");
+                            strokeWeight(lineWidth);
+                            let x = perceptron.X + nodeRadius;
+                            let y = perceptron.Y;
+                            let x2 = nextLayer.Perceptrons[i].X - nodeRadius;
+                            let y2 = nextLayer.Perceptrons[i].Y;
+                            line(x, y, x2, y2);
+                            noStroke();
+                            strokeWeight(1);
+        
+                            
+                            //draw text connection line weight
+                            fill("black");
+                            stroke("black")
+                            let number = Number(perceptron.Weights[i]);
+                            text(number.toFixed(2), (x + x2) / 2, (y2 + y) / 2); 
+                            noFill();
+                            noStroke();
+                            
+                        }
+                    }
+                });
             }
-        }
-        return undefined;
-    }
-    resetSelectedPerceptron()
-    {
-        this.getLayers().forEach(layer => 
-        {
-            layer.resetSelectedPerceptron();
-        });
-    }
-}
-class Perceptron
-{
-    constructor(activationFunction)
-    {
-        this.Inputs = [];
-        this.ActivationFunction = activationFunction;  
-    }
-    setConnection(connectedPerceptrons)
-    {
-        if(connectedPerceptrons.length > 0)
-        {
-            this.ConnectedPerceptrons = connectedPerceptrons;
-            this.Weights = [];
-            for(let i = 0; i < connectedPerceptrons.length; i++)
-            {
-                this.Weights.push(random(-1, 1));
-            }
-        }
-    }
-    draw(layerIndex, layerEmptyPixel, perceptronIndex, offset, hasSelectedPerceptron)
-    {
-        stroke("black");
-        let x = 2 * nodeRadius + (layerIndex * (2 * nodeRadius + layerEmptyPixel));
-        let y = nodeRadius + offset + ((perceptronIndex * nodeRadius * 2) + (perceptronIndex * nodeEmptyPixel));
-        if(this.Selected)
-        {
-            fill("orange");
         }
         else
         {
-            fill("white");
-        }
-        ellipse(x, y, 2 * nodeRadius);
-        if((hasSelectedPerceptron && this.Selected) || (!hasSelectedPerceptron))
-        {
-            if(this.ConnectedPerceptrons)
-            {
-                let offset2 = (height - (this.ConnectedPerceptrons.length * nodeRadius * 2 + ((this.ConnectedPerceptrons.length- 1) * nodeRadius))) / 2;
-                for(let j = 0; j < this.ConnectedPerceptrons.length; j++)
-                {
-                    stroke("blue");
-                    let x2 = 2 * nodeRadius + ((layerIndex + 1) * (2 * nodeRadius + layerEmptyPixel));
-                    let y2 = nodeRadius + offset2 + ((j * nodeRadius * 2) + (j * nodeEmptyPixel));
-                    line(x + nodeRadius, y, x2 - nodeRadius, y2);
-                    if(hasSelectedPerceptron)
-                    {
-                        let number = Number(this.Weights[j]);
-                        fill("black");
-                        stroke("black")
-                        text(number.toFixed(2), (x + x2) / 2, (y2 + y) / 2); 
-                    }
-                }
-            }
-        }
-        else if(hasSelectedPerceptron)
-        {
-            if(this.ConnectedPerceptrons)
-            {
-                let offset2 = (height - (this.ConnectedPerceptrons.length * nodeRadius * 2 + ((this.ConnectedPerceptrons.length- 1) * nodeRadius))) / 2;
-                for(let j = 0; j < this.ConnectedPerceptrons.length; j++)
-                {
-                    if(this.ConnectedPerceptrons[j].Selected)
-                    {
-                        stroke("blue");
-                        let x2 = 2 * nodeRadius + ((layerIndex + 1) * (2 * nodeRadius + layerEmptyPixel));
-                        let y2 = nodeRadius + offset2 + ((j * nodeRadius * 2) + (j * nodeEmptyPixel));
-                        line(x + nodeRadius, y, x2 - nodeRadius, y2);
-                        let number = Number(this.Weights[j]);
-                        fill("black");
-                        stroke("black")
-                        let m = y2 - y / x2-x;
-                        //console.log("m: " + m);
-                        text(number.toFixed(2), (x + x2) / 2, (y2 + y) / 2); 
-                        //textObject.rotate(m);
-                    }
-                }
-            }
+            console.log("Can't draw not generated neural network");
         }
     }
-    isPixelContains(point, layerIndex, layerEmptyPixel, perceptronIndex, offset)
+    feedForward(input)
     {
-        let x = 2 * nodeRadius + (layerIndex * (2 * nodeRadius + layerEmptyPixel));
-        let y = nodeRadius + offset + ((perceptronIndex * nodeRadius * 2) + (perceptronIndex * nodeEmptyPixel));
-        if(sqrt(pow((point.X - x), 2) + pow((point.Y - y), 2)) < nodeRadius)
+        if(this.Layers)
         {
-            return this;
+            if(input.length === this.Layers[0].Perceptrons.length)
+            {
+                for(let i = 0; i < input.length; i++)
+                {
+                    this.Layers[0].Perceptrons[i].Input = input[i];
+                }
+                for(let layerIndex = 0; layerIndex < this.Layers.length - 1; layerIndex++)
+                {
+                    for(let i = 0; i < this.Layers[layerIndex + 1].Perceptrons.length; i++)
+                    {
+                        let sum = 0;
+                        this.Layers[layerIndex].Perceptrons.forEach(perceptron => 
+                        {
+                            sum += perceptron.Weights[i] * perceptron.Input;
+                        });
+                        if(this.Layers[layerIndex + 1].Perceptrons[i].Bias)
+                        {
+                            sum += this.Layers[layerIndex + 1].Perceptrons[i].Bias;   
+                        }
+                        this.Layers[layerIndex + 1].Perceptrons[i].Input = this.Layers[layerIndex + 1].ActivationFunction(sum)
+                    }
+                }
+                let output = [];
+                this.Layers[this.Layers.length - 1].Perceptrons.forEach(perceptron => 
+                {
+                    output.push(perceptron.Input);
+                });
+                return output;
+            }
+            else
+            {
+                console.log("Input length overflow the input layer");
+            }
         }
         else
         {
-            return undefined;
+            console.log("Can't feedForward not generated neural network");
+        }
+    }
+    train(input, desired)
+    {
+        if(input.length === this.Layers[0].Perceptrons.length)
+        {
+            if(desired.length === this.Layers[this.Layers.length - 1].Perceptrons.length)
+            {
+                var guess = this.feedForward(input);
+                for(let i = 0; i < desired.length; i++)
+                {
+                    this.Layers[this.Layers.length - 1].Perceptrons[i].Error = desired[i] - guess[i];
+                }
+                for(let layerIndex = this.Layers.length - 1; layerIndex > 0; layerIndex--)
+                {
+                    let sum = 0;
+                    for(let i = 0; i < this.Layers[layerIndex].Perceptrons.length; i++)
+                    {
+                        for(let j = 0; j < this.Layers[layerIndex - 1].Perceptrons.length; j++)
+                        {
+                            sum += this.Layers[layerIndex - 1].Perceptrons[j].Weights[i];
+                        }
+                    }
+                    for(let i = 0; i < this.Layers[layerIndex].Perceptrons.length; i++)
+                    {
+                        for(let j = 0; j < this.Layers[layerIndex - 1].Perceptrons.length; j++)
+                        {
+                            this.Layers[layerIndex - 1].Perceptrons[j].Error = (this.Layers[layerIndex - 1].Perceptrons[j].Weights[i] / sum) * this.Layers[layerIndex].Perceptrons[i].Error;
+                            console.log("(" + this.Layers[layerIndex - 1].Perceptrons[j].Weights[i]  + " / " + sum + ") * " + this.Layers[layerIndex].Perceptrons[i].Error);
+                            let deltaWeight = this.LearningRate * this.Layers[layerIndex - 1].Perceptrons[j].Error * this.Layers[layerIndex - 1].Perceptrons[j].Input;
+                            let deltaBias = this.LearningRate * this.Layers[layerIndex - 1].Perceptrons[j].Error;
+                            this.Layers[layerIndex - 1].Perceptrons[j].Weights[i] += deltaWeight;
+                            this.Layers[layerIndex - 1].Perceptrons[j].Bias += deltaBias;
+                        }
+                    }  
+                }
+            }
+            else
+            {
+                console.log("desired length overflow the output layer");
+            }
+        }
+        else
+        {
+            console.log("input length overflow the input layer");
+        }
+    }
+    selectPerceptron(point)
+    {
+        let isEmptyPoint = true;
+        this.Layers.forEach(layer => 
+        {
+            layer.Perceptrons.forEach(perceptron => 
+            {
+                if(sqrt(pow((point.X - perceptron.X), 2) + pow((point.Y - perceptron.Y), 2)) < nodeRadius)
+                {
+                    perceptron.Selected = true;
+                    this.SelectedPerceptron = perceptron; 
+                    isEmptyPoint = false;
+                }
+                else
+                {
+                    perceptron.Selected = false;
+                }
+            })
+        })
+        if(isEmptyPoint)
+        {
+            this.SelectedPerceptron = undefined;
         }
     }
 }
 class Layer
 {
-    constructor(perceptronCount, nextLayer = undefined, activationFunction)
+    constructor(perceptronCount, layerIndex, layerEmptyPixel, activationFunction)
     {
-        this.PerceptronCount = perceptronCount;
-        this.ActivationFunction = activationFunction;
         this.Perceptrons = [];
-        for(let i = 0; i < this.PerceptronCount; i++)
+        let offset = (height - (perceptronCount * nodeRadius * 2 + ((perceptronCount - 1) * nodeRadius))) / 2;
+        for(let perceptronIndex = 0; perceptronIndex < perceptronCount; perceptronIndex++)
         {
-            this.Perceptrons.push(new Perceptron(this.ActivationFunction));
+            let x = 2 * nodeRadius + (layerIndex * (2 * nodeRadius + layerEmptyPixel));
+            let y = nodeRadius + offset + ((perceptronIndex * nodeRadius * 2) + (perceptronIndex * nodeEmptyPixel));
+            this.Perceptrons.push(new Perceptron(x, y));
         }
-        this.setNextLayer(nextLayer);
-    }
-    setNextLayer(nextLayer)
-    {
-        if(nextLayer)
+        if(activationFunction)
         {
-            this.Perceptrons = [];
-            for(let i = 0; i < this.PerceptronCount; i++)
-            {
-                let arr = [];
-                if(nextLayer)
-                {
-                    for(let j = 0; j < nextLayer.PerceptronCount; j++)
-                    {
-                        arr.push(nextLayer.Perceptrons[j]);
-                    }
-                }
-                let newPerceptron = new Perceptron(this.ActivationFunction);
-                newPerceptron.setConnection(arr);
-                this.Perceptrons.push(newPerceptron);
-            }  
-        }
-        this.NextLayer = nextLayer;
-    }
-    draw(layerIndex, layerEmptyPixel, hasSelectedPerceptron)
-    {
-        let offset = (height - (this.PerceptronCount * nodeRadius * 2 + ((this.PerceptronCount - 1) * nodeRadius))) / 2;
-        for(let i = 0; i < this.PerceptronCount; i++)
-        {
-            this.Perceptrons[i].draw(layerIndex, layerEmptyPixel, i, offset, hasSelectedPerceptron);
+            this.ActivationFunction = activationFunction;
         }
     }
-    isPixelContains(point, layerIndex, layerEmptyPixel)
+}
+class Perceptron
+{
+    constructor(x, y)
     {
-        let offset = (height - (this.PerceptronCount * nodeRadius * 2 + ((this.PerceptronCount - 1) * nodeRadius))) / 2;
-        for(let i = 0; i < this.PerceptronCount; i++)
-        {
-            let back = this.Perceptrons[i].isPixelContains(point, layerIndex, layerEmptyPixel, i, offset);
-            if(back)
-            {
-                return back;
-            }
-        }
+        this.X = x;
+        this.Y = y;
     }
-    resetSelectedPerceptron()
+    initWeights(perceptronCount)
     {
-        for(let i = 0; i < this.PerceptronCount; i++)
+        this.Weights = [];
+        for(let i = 0; i < perceptronCount; i++)
         {
-            this.Perceptrons[i].Selected = false;
+            this.Weights.push(random(-1, 1));
+        } 
+    }
+    draw()
+    {
+        stroke(this.Selected ? "blue" : "black");
+        strokeWeight(lineWidth);
+        fill("white");
+        ellipse(this.X, this.Y, 2 * nodeRadius);
+        noFill();
+        noStroke();
+        strokeWeight(1);
+
+        if(this.Input)
+        {
+            stroke("black");
+            fill("black");
+            textAlign(CENTER);
+            let number = Number(this.Input);
+            text(number.toFixed(2), this.X, this.Y);
+            noFill();
+            noStroke();
         }
     }
 }
