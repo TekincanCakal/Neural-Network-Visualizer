@@ -1,31 +1,12 @@
 <html>
-
 <head>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.3.0/lib/p5.js"></script>
-  <script src="nn.js"></script>
+  <script src="NeuralNetwork.js"></script>
   <script src="sketch.js"></script>
 </head>
-
-<body>
+<body style="margin: 0px;">
   <center>
-    <div>
-      <span style="font-size: 32px;" id="timerText">Time: 00:00:00</span>
-    </div>
-    <br>
-    <div>
-      <span id="frameRateSliderText"></span>
-      <div>
-        <input type="range" min="1" max="60" value="60" class="slider" id="frameRateSlider">
-      </div>
-    </div>
-    <br>
-    <div>
-      <button onclick="startStop()" id="startButton">Start</button>
-    </div>
-    <br>
-    <div id="canvas">
-      
-    </div>
+    <div id="canvas"></div>
   </center>
 </body>
 
